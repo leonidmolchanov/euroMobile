@@ -69,8 +69,9 @@ forTask.constructor.createTable.user = function (user, calendar, worktime, data)
         }
         tasks.forEach(function (item) {
             if(item['START_DATE_PLAN']!==null && item['PARENT_ID']!==null && item['DURATION_PLAN']!=="0") {
-                if (item['STATUS'] == 2 || item['STATUS'] == -2) {
+                if (item['STATUS'] == 2 || item['STATUS'] == -2 || item['STATUS'] == -3) {
                     if (parseDate(item['START_DATE_PLAN']) == date) {
+
                         count += Number(item['TIME_ESTIMATE'])
                     }
                 }
@@ -88,11 +89,11 @@ forTask.constructor.createTable.user = function (user, calendar, worktime, data)
                     if (item[1] !== true) {
                         if (userData["UF_TASK_WORK_TIME"] !== null) {
                             time = userData["UF_TASK_WORK_TIME"] - checkDate(item[0], userData.TASKS);
-                            content += '<td onclick="selectElement(this)" ondblclick="forTask.showTasksDay(this,data)" data-user-id="' + userData["ID"] + '"  data-date="' + item[0] + '" class="' + classGen(time) + '">' + time + '</td>';
+                            content += '<td onclick="selectElement(this)" ondblclick="forTask.showTasksDay(this,data)" name="show-time" data-user-id="' + userData["ID"] + '"  data-date="' + item[0] + '" class="' + classGen(time) + '">' + time + '</td>';
                         }
                         else {
                             time = worktime.endtime - worktime.starttime - checkDate(item[0], userData.TASKS);
-                            content += '<td onclick="selectElement(this)" ondblclick="forTask.showTasksDay(this, data)" data-user-id="' + userData["ID"] + '" data-date="' + item[0] + '" class="' + classGen(time) + '">' + time + '</td>';
+                            content += '<td onclick="selectElement(this)" ondblclick="forTask.showTasksDay(this, data)" name="show-time" data-user-id="' + userData["ID"] + '" data-date="' + item[0] + '" class="' + classGen(time) + '">' + time + '</td>';
                         }
                     }
                     else {
@@ -139,19 +140,33 @@ forTask.constructor.createPersonal = function(person){
 };
 ////////////////////////////
 //Buttons constructor
-forTask.constructor.createButton = function(type, className, value, functionName, url, params, data){
-    content = '<button type="'+type+'" onClick="'+functionName+'(forTask.url, params, data)" class="'+className+'">'+value+'</button>';
+forTask.constructor.createButton = function(type, className, value, functionName, url, params, data, id){
+    content = '<button type="'+type+'" id="'+id+'" onClick="'+functionName+'(forTask.url, params, data)" class="'+className+'">'+value+'</button>';
     return content
 };
 //Функция выбора ячеек
-function selectElement(element){
-    if(element.className!=="nulltd") {
+function selectElement(element) {
+    if (element.className !== "nulltd") {
         if (element.className.match(/(?:^|\s)select(?!\S)/)) {
-            element.className =element.className.replace(/(?:^|\s)select(?!\S)/g, '')
+            element.className = element.className.replace(/(?:^|\s)select(?!\S)/g, '')
         }
         else {
             element.className += " select";
         }
+    }
+
+    selectCalendar = document.getElementsByClassName('select');
+// Проверка на выбронные дни наличие
+    if (data.subtask.length == 0) {
+        if (selectCalendar.length !== 0) {
+            document.getElementById('button-delegate-proc').className = "webform-small-button webform-small-button-accept";
+        }
+        else {
+            document.getElementById('button-delegate-proc').className = "webform-small-button webform-small-button-active";
+        }
+    }
+    else{
+        document.getElementById('button-delegate-proc').style.pointerEvents = 'none';
     }
 }
 // Функция загрузи главного окна
@@ -173,12 +188,21 @@ forTask.createTable = function() {
                             window.location.reload(false);
                         }
                         table = {};
+                        if(data.subtask.length!==0){
+                            settingButton = "<button onclick='forTask.settingTask(data.subtask, data.task, data)' class='webform-small-button webform-small-button-accept'><span class='webform-small-button-text'>" + BX.message('change_button') + "</span></button>";
+
+                        }
+                        else{
+                            settingButton = "<button  class='webform-small-button webform-small-button-active'><span class='webform-small-button-text'>" + BX.message('change_button') + "</span></button>";
+
+                        }
                     table.content = '<div class="conteiner">' +
                         forTask.constructor.createTable.table(forTask.constructor.createTable.thead(data.calendarModify), forTask.constructor.createTable.user(data.user.group, data.calendar, data.worktime, data)) +
-                        forTask.constructor.createButton("button", "webform-small-button webform-small-button-accept", BX.message('delegate'), "forTask.createTask", forTask.url, params, data) +
-                        "<button onclick='forTask.settingUser(data.user.group, data.worktime)' class='webform-small-button webform-small-button-accept'><span class='webform-small-button-text'>" + BX.message('setting_button') + "</span></button>" +
-                        "<button onclick='forTask.settingTask(data.subtask, data.task, data)' class='webform-small-button webform-small-button-accept'><span class='webform-small-button-text'>" + BX.message('change_button') + "</span></button>" +
+                        forTask.constructor.createButton("button", "webform-small-button webform-small-button-active", BX.message('delegate'), "forTask.createTask", forTask.url, params, data, "button-delegate-proc") +
+                        settingButton+
+                        "<button style='float:right' onclick='forTask.settingUser(data.user.group, data.worktime)' class='webform-small-button webform-small-button-accept'><span class='webform-small-button-text'>" + BX.message('setting_button') + "</span></button>" +
                         '</div>';
+
                     forTask.createTable.popup = new BX.PopupWindow('main', null, {
                         lightShadow: false,
                         closeByEsc: true,
@@ -193,7 +217,7 @@ forTask.createTable = function() {
                         })
                     });
                     forTask.createTable.popup.show();
-                }
+                    }
 else{
                         content="<form>";
                         content += "<table cellpadding='0' cellspacing='0' border='0' class='Tasktable'  width='100%'><tr><td class='head-td'>"+BX.message('timeForTask')+"</td></tr>" ;
@@ -201,6 +225,10 @@ else{
                         content +="</table>";
                         content += '<br><button type="button" onClick="forTask.setTaskTime(this.form)" class="webform-small-button webform-small-button-accept">'+BX.message('toDo')+'</button>';
                         content +="</form>";
+                        if(document.getElementById('main')){
+                            forTask.createTable.close();
+
+                        }
                         forTask.createTable.popup = new BX.PopupWindow('main', null, {
                             lightShadow: false,
                             closeByEsc: true,
@@ -235,6 +263,7 @@ forTask.createTableForce = function() {
                      table.content = '<div class="conteiner">' +
                          forTask.constructor.createTable.table(forTask.constructor.createTable.thead(data.calendarModify), forTask.constructor.createTable.user(data.user.group, data.calendar, data.worktime, data)) +
                 '</div>';
+
                     forTask.createTable.popup = new BX.PopupWindow('main', null, {
                         lightShadow: false,
                         closeByEsc: true,
@@ -287,6 +316,10 @@ content+='<tr class="settingUserRow"><td class="null-td"><a href="/company/perso
     content+="</table>";
     content += '<button type="button" onClick="forTask.saveSettingUser(this.form)" class="webform-small-button webform-small-button-accept">'+BX.message("save")+'</button>';
     content +="</form>";
+    if(document.getElementById('settingUserPopup')){
+        forTask.createSettingUserPopup.close();
+
+    }
     forTask.createSettingUserPopup = new BX.PopupWindow('settingUserPopup', null, {
         lightShadow: true,
         closeByEsc: true,
@@ -308,6 +341,10 @@ content+='<tr class="settingUserRow"><td class="null-td"><a href="/company/perso
     forTask.createSettingUserPopup.show();
 }
 forTask.settingTask = function(subtask, task, data){
+    if(document.getElementById('create-setting-task-table'))
+    {
+        window.location.reload()
+    }
     function parseDateformat(date) {
         content = date.split(' ');
         content = content[0].split('.');
@@ -323,20 +360,23 @@ forTask.settingTask = function(subtask, task, data){
 
     }
     content = "<form>";
-    content += "<table cellpadding='0' cellspacing='0' border='0' class='Tasktable'  width='100%'><tr><td class='head-td'>"+BX.message('timeForTask')+":</td><td class='null-td' colspan='3'>"+(task['TIME_ESTIMATE']/3600).toFixed()+" "+BX.message('hour')+"</td></tr>";
+    content += "<table cellpadding='0' cellspacing='0' border='0' class='Tasktable' id='create-setting-task-table' width='100%'><tr><td class='head-td'>"+BX.message('timeForTask')+":</td><td class='null-td' colspan='3'>"+(task['TIME_ESTIMATE']/3600).toFixed()+" "+BX.message('hour')+"</td></tr>";
     content += "<tr><td class='head-td'>"+BX.message('subtask_name')+"</td><td class='head-td'>"+BX.message('subtask_time')+"</td><td class='head-td'>"+BX.message('data')+"</td><td class='head-td'>"+BX.message('time_to_start')+"</td></tr>" ;
     subtask.forEach(function (item) {
-        if(item['STATUS']==2 || item['STATUS']==-2) {
+        if(item['STATUS']==2 || item['STATUS']==-2 | item['STATUS']==-3) {
         status="true"
         }
         else{
             status="false"
         }
-            content += "<tr class='subtaskList'><td class='null-td'>" + item['TITLE'] + "</td><td class='null-td'><input type='number'  data-id='" + item['ID'] + "' min='0' max='24'  value='" +(item['TIME_ESTIMATE']/3600).toFixed() + "' class='calendar-field calendar-field-datetime' size='2' maxlength='2'></td><td class='null-td'><input type='date' data-id='" + item['ID'] + "' value='" + parseDateformat(item['START_DATE_PLAN']) + "' class='calendar-field calendar-field-datetime'></td><td class='null-td'><input type='time' step='3600' data-id='" + item['ID'] + "' value='" + parseTimeformat(item['START_DATE_PLAN']) + "' class='calendar-field calendar-field-datetime'></td></tr>";
+            content += "<tr class='subtaskList'><td class='null-td'>" + item['TITLE'] + "</td><td class='null-td'><input type='number'  onchange='forTask.checkFreeTimeForDate(this.parentNode.parentNode.parentNode.parentNode," + item['RESPONSIBLE_ID'] + ")' data-id='" + item['ID'] + "' min='0' max='24'  value='" +(item['TIME_ESTIMATE']/3600).toFixed() + "' class='calendar-field calendar-field-datetime' size='2' maxlength='2'></td><td class='null-td'><input type='date' onchange='forTask.checkFreeTimeForDate(this.parentNode.parentNode.parentNode.parentNode," + item['RESPONSIBLE_ID'] + ")' data-id='" + item['ID'] + "' value='" + parseDateformat(item['START_DATE_PLAN']) + "' class='calendar-field calendar-field-datetime'></td><td class='null-td'><input type='time' step='3600' data-id='" + item['ID'] + "' value='" + parseTimeformat(item['START_DATE_PLAN']) + "' class='calendar-field calendar-field-datetime'></td></tr>";
         });
     content+="</table>";
-    content += '<button  type="button" onclick="forTask.changeTaskSetting(this.form, data)"  class="webform-small-button webform-small-button-accept">'+BX.message('change_button')+'</button>';
+    content += '<button  type="button" onclick="forTask.changeTaskSetting(this.form, data)"  id="change-task-button" class="webform-small-button webform-small-button-accept">'+BX.message('change_button')+'</button>';
     content += "</form>";
+    if(document.getElementById('settingTaskPopup')){
+        forTask.createSettingTaskPopup.close();
+    }
     forTask.createSettingTaskPopup = new BX.PopupWindow('settingTaskPopup', null, {
         lightShadow: true,
         closeByEsc: true,
@@ -357,6 +397,50 @@ forTask.settingTask = function(subtask, task, data){
     });
     forTask.createSettingTaskPopup.show();
 }
+
+// Проверка свободного времени на дату
+forTask.checkFreeTimeForDate = function(nodes, id){
+    function DateFormat(date) {
+        content = date;
+        content = content.split('-');
+        content = content['2'] + '.' + content['1'] + '.' + content['0'];
+        return content;
+
+    }
+arr=nodes.getElementsByClassName('subtaskList')
+    checkDateErr=0;
+    count=0;
+   for(row in arr){
+       if(typeof arr[row]=='object') {
+           date = arr[row].childNodes[2].childNodes[0].value;
+           time = Number(arr[row].childNodes[1].childNodes[0].value);
+           document.getElementById('change-task-button').style.display = 'none';
+
+    td=document.getElementsByName('show-time');
+           checkDate=0;
+    td.forEach(function (item) {
+    if(item.attributes['data-user-id'].value==id && item.attributes['data-date'].value==DateFormat(date)) {
+        if(Number(item.innerText)>=time) {
+        }
+        else{
+            count++
+        }
+
+    }
+if(item.attributes['data-date'].value==DateFormat(date)){
+        checkDate++;
+}
+})
+if(checkDate==0){
+        checkDateErr=1;
+}
+       }
+}
+if(count==0 && checkDateErr==0) {
+    document.getElementById('change-task-button').style.display = 'block';
+}
+}
+
 //Окно детального просмотра задач по дню
 forTask.showTasksDay = function(date, data){
     function getSubtask(taskId, data){
@@ -395,7 +479,7 @@ forTask.showTasksDay = function(date, data){
         if(item['ID']==date.attributes['data-user-id'].value) {
             item.TASKS.forEach(function (task) {
                 if (task['PARENT_ID'] !== null && task['START_DATE_PLAN'].includes(date.attributes['data-date'].value)) {
-            if(task['STATUS']==2 || task['STATUS']==-2){
+            if(task['STATUS']==2 || task['STATUS']==-2 || task['STATUS']==-3){
                     contentProgress = getSubtask(task["PARENT_ID"], data);
                     progerssHTML = 0;
                     contentProgress.forEach(function (item) {
@@ -420,6 +504,10 @@ forTask.showTasksDay = function(date, data){
         }
     });
     content+="</table>";
+    if(document.getElementById('ShowTasksDay')){
+        forTask.createShowTasksDayPopup.close();
+
+    }
     forTask.createShowTasksDayPopup = new BX.PopupWindow('ShowTasksDay', null, {
         lightShadow: true,
         closeByEsc: true,
@@ -443,15 +531,21 @@ forTask.showTasksDay = function(date, data){
 // Окно настроек создания задачи
 forTask.createTask = function(url, params, data) {
     selectCalendar = document.getElementsByClassName('select');
-        content = "<form  id='createTasksForm'>";
-        content += "<table cellpadding='0' cellspacing='0' border='0' class='Tasktable' id='submitTable' width='100%'><tr><td colspan='2' class='head-td'>"+BX.message('sum_task_time')+":</td><td class='head-td'><input   type='number'  class='changeTaskTime' min='0'  placeholder='"+(data.task['TIME_ESTIMATE']/3600).toFixed()+"' class='calendar-field calendar-field-datetime' size='2' maxlength='2'></td></tr>" ;
-        content +="<tr><td class='head-td' colspan='2'>Дата:</td><td class='Headtd'>Время:</td></tr>";
-    timeForTask =(data.task['TIME_ESTIMATE']/3600).toFixed()
+// Проверка на выбронные дни наличие
+   if(selectCalendar.length!==0){
+    content = "<form  id='createTasksForm'>";
+    content += "<table cellpadding='0' cellspacing='0' border='0' class='Tasktable' id='submitTable' width='100%'><tr><td colspan='2' class='head-td'>" + BX.message('sum_task_time') + ":</td><td class='head-td'><input   type='number' id='count-task-time' class='changeTaskTime' min='0'  value='" + (data.task['TIME_ESTIMATE'] / 3600).toFixed() + "' class='calendar-field calendar-field-datetime' size='2' maxlength='2'></td></tr>";
+       content += "<tr><td class='head-td' colspan='2'>Не распределенные часы:</td><td class='null-td'><span id='freeTime'></span></td></tr>";
+       content += "<tr><td class='head-td' colspan='2'>Дата:</td><td class='Headtd'>Время:</td></tr>";
+    timeForTask = (data.task['TIME_ESTIMATE'] / 3600).toFixed()
+
     function parseDateformat(date) {
-       content = date.split('.');
-        content = content['2']+'-'+content['1']+'-'+content['0'];
-        return content ;
+        content = date.split('.');
+        content = content['2'] + '-' + content['1'] + '-' + content['0'];
+        return content;
     }
+
+
 // Функция проверки и сдвига стартового времени
     function changeTaskStartTime(id, dayTime, date) {
         // Функция переформатирования времени
@@ -459,12 +553,14 @@ forTask.createTask = function(url, params, data) {
             response = daytime;
             response = response.split(' ');
             response = response[1].split(':');
-            response=Number(response[0]);
+            response = Number(response[0]);
             return response;
 
         }
-        result  = timerFormat(dayTime.starttime);
-       // Функция переформатирования даты
+
+        result = timerFormat(dayTime.starttime);
+
+        // Функция переформатирования даты
         function dateFormat(dayDate) {
             response = dayDate;
             response = response.split(' ');
@@ -472,54 +568,61 @@ forTask.createTask = function(url, params, data) {
             return response;
 
         }
-        function timerFormat(t){
-            response="";
-if (t<10){
-    response = "0"+t+":00";
-}
-else{
-    response = t+":00";
-}
-return response;
+
+        function timerFormat(t) {
+            response = "";
+            if (t < 10) {
+                response = "0" + t + ":00";
+            }
+            else {
+                response = t + ":00";
+            }
+            return response;
         }
-        data.user.group.forEach( function (item) {
-            if(item['ID']==id){
-                      item['TASKS'].forEach(function (task) {
-                     if(task['START_DATE_PLAN']!==null) {
-                        if (task['STATUS'] == 2 || task['STATUS'] == -2) {
-                            if(date == dateFormat(task['START_DATE_PLAN'])) {
-                                for (var i = dayTime.starttime; i < dayTime.endtime+1 ; i++) {
-                                    if(i == timeFormat(task['START_DATE_PLAN'])){
+
+        data.user.group.forEach(function (item) {
+            if (item['ID'] == id) {
+                item['TASKS'].forEach(function (task) {
+                    if (task['START_DATE_PLAN'] !== null) {
+                        if (task['STATUS'] == 2 || task['STATUS'] == -2 || task['STATUS'] == -3) {
+                            if (date == dateFormat(task['START_DATE_PLAN'])) {
+                                for (var i = dayTime.starttime; i < dayTime.endtime + 1; i++) {
+                                    if (i == timeFormat(task['START_DATE_PLAN'])) {
                                         result = timerFormat(timeFormat(task['END_DATE_PLAN']))
                                         break
                                     }
                                 }
                             }
                         }
-                     }
-                 })
-             }
+                    }
+                })
+            }
         })
         return result;
     }
-        for (var i = 0; i < selectCalendar.length; i++) {
+
+    for (var i = 0; i < selectCalendar.length; i++) {
         time = Number(selectCalendar[i].innerText);
         timeToTable = 0;
-        if(timeForTask - time >=0)
-        {
-            timeForTask -=time;
+        if (timeForTask - time >= 0) {
+            timeForTask -= time;
             TimeToTable = time;
         }
-        else{
+        else {
             TimeToTable = timeForTask;
             timeForTask = 0;
-            }
-        content += "<tr class='submitElement'><td class='null-td'><input type='date' data-user-id='"+selectCalendar[i].attributes['data-user-id'].value+"' value='"+parseDateformat(selectCalendar[i].dataset.date)+"' class='calendar-field calendar-field-datetime' disabled></td><td class='null-td'><input data-user-id='"+selectCalendar[i].attributes['data-user-id'].value+"' class='calendar-field calendar-field-datetime' type='time' value='"+changeTaskStartTime(selectCalendar[i].attributes['data-user-id'].value, data.worktime, selectCalendar[i].dataset.date)+"' step='3600'></td><td class='null-td'><input   type='number'  data-user-id='"+selectCalendar[i].attributes['data-user-id'].value+"' min='0' max='"+time+"' value='"+TimeToTable+"' class='calendar-field calendar-field-datetime' size='2' maxlength='2'></td></tr>"
+        }
+        content += "<tr class='submitElement'><td class='null-td'><input type='date' data-user-id='" + selectCalendar[i].attributes['data-user-id'].value + "' value='" + parseDateformat(selectCalendar[i].dataset.date) + "' class='calendar-field calendar-field-datetime' disabled></td><td class='null-td'><input data-user-id='" + selectCalendar[i].attributes['data-user-id'].value + "' class='calendar-field calendar-field-datetime' type='time' value='" + changeTaskStartTime(selectCalendar[i].attributes['data-user-id'].value, data.worktime, selectCalendar[i].dataset.date) + "' step='3600'></td><td class='null-td'><input   type='number' onchange='forTask.countTaskTime()' data-user-id='" + selectCalendar[i].attributes['data-user-id'].value + "' min='0' max='" + time + "' value='" + TimeToTable + "' class='calendar-field calendar-field-datetime' size='2' maxlength='2'></td></tr>"
     }
-    content+="</table>";
-    content += '<button type="button" onClick="forTask.submitCreateTask(this.form, data)" class="webform-small-button webform-small-button-accept">'+BX.message('splitting_create')+'</button>';
+    content += "</table>";
+    content += '<button type="button" onClick="forTask.submitCreateTask(this.form, data)" class="webform-small-button webform-small-button-accept">' + BX.message('splitting_create') + '</button>';
     content += "</form>";
-    forTask.createTaskPopup = new BX.PopupWindow('changeTask', null, {
+    // Исправляем залипание кнопок
+       if(document.getElementById('changeTask')){
+           forTask.createTaskPopup.close();
+
+       }
+        forTask.createTaskPopup = new BX.PopupWindow('changeTask', null, {
             lightShadow: true,
             closeByEsc: true,
             closeIcon: true,
@@ -537,11 +640,13 @@ return response;
 
                 })
         });
-    forTask.createTaskPopup.show();
-
+        forTask.createTaskPopup.show();
+    }
 };
+
 // Создание задачи
 forTask.submitCreateTask = function(form, data) {
+
     taskTime = form.getElementsByClassName('changeTaskTime')
 
     function parseForm(form) {
@@ -636,7 +741,7 @@ forTask.submitCreateTask = function(form, data) {
                 if(item['ID']==checkUser(form)){
                     item['TASKS'].forEach(function (task) {
                         if(task['START_DATE_PLAN']!==null) {
-                            if (task['STATUS'] == 2 || task['STATUS'] == -2) {
+                            if (task['STATUS'] == 2 || task['STATUS'] == -2 || task['STATUS'] == -3) {
                                 if (DateFormat(parseFor[0]) === task['START_DATE_PLAN'].split(" ")[0]) {
                                     response = checkTaskTime(parseFor, task);
                                 }
@@ -671,6 +776,7 @@ if(item[2]==0){
             else {
             if(checkZeroTask(parseForm(form))=="success") {
                 // if(checkTaskTimeResult(form) =="success"){
+                console.log(document.getElementById('count-task-time').value);
 
                     request = [];
                     request.data = data;
@@ -680,14 +786,19 @@ if(item[2]==0){
                         href: document.location.href,
                         type: "addTasks",
                         data: parseForm(form),
-                        userid: checkUser(form)
+                        userid: checkUser(form),
+                        tasktime: document.getElementById('count-task-time').value
                     }
                     BX.ajax.get(forTask.url,
                         params,
                         function (response) {
+                        console.log(response)
                             if(response=="success"){
                                 alert(BX.message('task_delegate_proc'));
                                 window.location.reload(false);
+                            }
+                            else if(response=="no-time"){
+                                alert(BX.message('no_time'));
                             }
                         });
             }
@@ -712,6 +823,7 @@ forTask.saveSettingUser = function (data) {
         content=data.getElementsByTagName('input');
         result={};
         for (var i = 0; i < content.length; i++) {
+            console.log(content)
             if(!result[content[i].attributes['data-userid'].value]){
                 result[content[i].attributes['data-userid'].value]={};
             }
@@ -742,6 +854,28 @@ forTask.saveSettingUser = function (data) {
 
 
 }
+
+// Функция подсчета остатка времени
+
+
+forTask.countTaskTime = function() {
+    form = document.getElementById('createTasksForm')
+    td = form.getElementsByClassName('submitElement');
+    count = 0;
+    for (var y = 0; y < td.length; y++) {
+            element = td[y].getElementsByTagName('input')
+        count += Number(element[2].value);
+
+}
+
+reqTime = Number(document.getElementById('count-task-time').value)
+sumTime = reqTime - count;
+    if(sumTime<0){
+        sumTime = 0
+    }
+    document.getElementById('freeTime').innerText = sumTime;
+}
+
 //Функция установки общего времени на задачу
 forTask.setTaskTime = function(form){
     content=form.getElementsByTagName('input');
@@ -820,6 +954,10 @@ forTask.changeTaskSetting = function (form, data) {
                     alert(BX.message('setting_subtask_change'));
                     window.location.reload(false);
                 }
+                else if(response=="error_pass"){
+                    alert("Некоторые из задач не распределены!")
+                }
+                else{alert("Ошибка распределения!")}
             });
 
     }
@@ -863,6 +1001,10 @@ forTask.showDetailTask = function(data){
             content+="<tr><td class='null-td'>"+item['TITLE']+"</td><td class='null-td'>"+item['START_DATE_PLAN']+"</td><td class='null-td'>"+item['END_DATE_PLAN']+"</td><td class='null-td'>"+item['COMPLETE_STATUS']+"%</td></tr>"
         })
         content += "</table>";
+            if(document.getElementById('ShowDetailTask')){
+                forTask.createShowDetailTaskPopup.close();
+
+            }
             forTask.createShowDetailTaskPopup = new BX.PopupWindow('ShowDetailTask', null, {
                 lightShadow: true,
                 closeByEsc: true,

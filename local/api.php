@@ -9,6 +9,7 @@ if($_REQUEST['sessid']==bitrix_sessid()):
     CModule::IncludeModule('calendar');
     CModule::IncludeModule('group');
     CModule::IncludeModule('CTaskPlannerMaintance');
+    CModule::IncludeModule("socialnetwork");
     // Определяем глобальную переменную пользователя
     global $USER;
     //Функция парсинга входных параметров
@@ -139,8 +140,40 @@ if($_REQUEST['sessid']==bitrix_sessid()):
             }
         }
     }
+
+
+
     // Модуль создания задачи
     if($_REQUEST['type']=="addTasks"):
+
+        // Функция проверки свободного времении на подзадачи
+        function checkfreeTime($subtaskArr){
+            $result=false;
+            foreach ($subtaskArr as $key => $item):
+                $date=date("d.m.Y",strtotime($item[0]));
+                $timeStart =strtotime($date.' '.$item[1]);
+                $timeEnd=strtotime("+".$item[2]." hours",strtotime($date.' '.$item[1]));
+                $subtask = CTasks::GetList(Array("TITLE" => "ASC"), Array("RESPONSIBLE_ID" => $_REQUEST['userid'],
+                    '>=START_DATE_PLAN' => $date.' 00:00',
+                    '<=END_DATE_PLAN' => $date.' 23:99'));
+                while ($arTask = $subtask->GetNext())
+                {
+                    if($timeStart > strtotime($arTask['START_DATE_PLAN']) && $timeStart < strtotime($arTask['END_DATE_PLAN'])):
+                        $result=true;
+                    endif;
+                    if($timeEnd > strtotime($arTask['START_DATE_PLAN']) && $timeEnd < strtotime($arTask['END_DATE_PLAN'])):
+                        $result=true;
+                    endif;
+                    if($timeStart <= strtotime($arTask['START_DATE_PLAN']) && $timeEnd >= strtotime($arTask['END_DATE_PLAN'])):
+                        $result=true;
+                    endif;
+                }
+            endforeach;
+            return $result;
+        }
+
+        if(!checkfreeTime($_REQUEST['data'])) {
+
       $core = new ClassCore($USER, getParam($_REQUEST['href']));
     $responce = "error";
     function checkTime($data){
@@ -156,6 +189,54 @@ if($_REQUEST['sessid']==bitrix_sessid()):
     }
     if(checkTime($_REQUEST['data'])=="success"):
         $DescriptionText= GetMessage('create_parts_tasks')." ".$core->task['ID']." :";
+       //Проверка дедлайна
+        foreach ($_REQUEST['data'] as $key => $item):
+            if(strtotime($item[0]." ".$item[1])>strtotime($core->task['DEADLINE'])):
+                $core->task['DEADLINE'] = date("d.m.Y H:i",strtotime("+".$item[2]." hours",strtotime($item[0]." ".$item[1])));
+// Изменяем дедлайн у головной задачи
+                if (CModule::IncludeModule("tasks")):
+                    $arFields = Array(
+                        "DEADLINE" =>  $core->task['DEADLINE'],
+                    );
+                    $ID = $core->task['ID'];
+                    $obTask = new CTasks;
+                    $rsTask = CTasks::GetByID($ID);
+                    $success = $obTask->Update($ID, $arFields);
+                    if ($success) {
+                        $responce="success";
+                        $DescriptionText="Дата крайнего срока была изменена на : ".$core->task['DEADLINE'];
+                        CTaskComments::Add($core->task['ID'],  1, $DescriptionText);
+                    } else {
+                        if ($e = $APPLICATION->GetException())
+                            $responce="error";
+                    }
+                endif;
+
+
+
+        endif;
+        endforeach;
+
+        // Изменение времени на задачу
+if($_REQUEST['tasktime']*3600!==$core->task['TIME_ESTIMATE']):
+        if (CModule::IncludeModule("tasks")):
+            $arFields = Array(
+                "TIME_ESTIMATE"=>$_REQUEST['tasktime']*3600,
+            );
+            $ID = $core->task['ID'];
+            $obTask = new CTasks;
+            $rsTask = CTasks::GetByID($ID);
+            $success = $obTask->Update($ID, $arFields);
+            if ($success) {
+                $responce="success";
+                $DescriptionText="Время на задачу было изменено : ".$_REQUEST['tasktime'];
+                CTaskComments::Add($core->task['ID'],  1, $DescriptionText);
+            } else {
+                if ($e = $APPLICATION->GetException())
+                    $responce="error";
+            }
+        endif;
+endif;
         foreach ($_REQUEST['data'] as $key => $item):
           // echo date("d-m-Y",strtotime($item[0]));
             if (CModule::IncludeModule("tasks"))
@@ -165,8 +246,8 @@ if($_REQUEST['sessid']==bitrix_sessid()):
                     "PARENT_ID"=>$core->task['ID'],
                     "RESPONSIBLE_ID"=>$_REQUEST['userid'],
                     "ALLOW_CHANGE_DEADLINE" => 'N',
-                    "DEADLINE"=>$core->task['DEADLINE'],
-                    "CREATED_BY"=>$_REQUEST['userid'],
+                    "DEADLINE"=>date("d.m.Y H:i",strtotime($item[0]." 23:59")),
+                    "CREATED_BY"=>$USER->GetId(),
                     "AUDITORS"=> [$USER->GetId()],
                     "TITLE" => "часть №".$numberPart,
                     "GROUP_ID" => $core->task['GROUP_ID'],
@@ -197,6 +278,8 @@ if($_REQUEST['sessid']==bitrix_sessid()):
                     break;
                 }
 
+
+
             }
         endforeach;
         CTaskComments::Add($core->task['ID'],  1, $DescriptionText);
@@ -216,9 +299,14 @@ if($_REQUEST['sessid']==bitrix_sessid()):
                     $responce="error";
             }
         endif;
-    else:
+        else:
         $responce="error";
-    endif;
+            endif;
+
+        }
+        else{
+        $responce='no-time';
+        }
        echo $responce;
        // Возвращение задачи
     elseif ($_REQUEST['type']=="returnTask"):
@@ -419,10 +507,47 @@ echo $responce;
                     echo json_encode($responce);
                     // Изменение задачи
     elseif ($_REQUEST['type']=="changeTasks"):
+
+        // Функция проверки свободного времении на подзадачи
+        function checkfreeTime($item, $key){
+            $result=false;
+                $res_id="";
+            $restask=CTasks::GetList(Array("TITLE" => "ASC"), Array("ID" => $key));
+                while ($arTask = $restask->GetNext())
+                {
+                    $res_id = $arTask['RESPONSIBLE_ID'];
+                }
+                $date=date("d.m.Y",strtotime($item['date']));
+                $timeStart =strtotime($date.' '.$item['startTime']);
+                $timeEnd=strtotime("+".$item['time']." hours",strtotime($date.' '.$item['startTime']));
+                $subtask = CTasks::GetList(Array("TITLE" => "ASC"), Array("RESPONSIBLE_ID" => $res_id,
+                    '>=START_DATE_PLAN' => $date.' 00:00',
+                    '<=END_DATE_PLAN' => $date.' 23:99'));
+                while ($arTask = $subtask->GetNext())
+                {
+                    if((int)$arTask['ID']!==$key) {
+                        if ($timeStart > strtotime($arTask['START_DATE_PLAN']) && $timeStart < strtotime($arTask['END_DATE_PLAN'])):
+                            $result = true;
+                        endif;
+                        if ($timeEnd > strtotime($arTask['START_DATE_PLAN']) && $timeEnd < strtotime($arTask['END_DATE_PLAN'])):
+                            $result = true;
+                        endif;
+                        if ($timeStart <= strtotime($arTask['START_DATE_PLAN']) && $timeEnd >= strtotime($arTask['END_DATE_PLAN'])):
+                            $result = true;
+                        endif;
+                    }
+                }
+            return $result;
+        }
+
         $responce="error";
         $parentId;
         $DescriptionText = GetMessage('setting_was_change');
+        $test=[];
         foreach ($_REQUEST['data'] as $key => $item):
+
+            if(!checkfreeTime($item, $key)):
+
             $arFields = Array(
                     "DURATION_PLAN"=>$item['date'],
                     "DURATION_TYPE"=>"hours",
@@ -451,9 +576,13 @@ echo $responce;
                         $responce="error";
                 }
             endif;
+
+            else:
+                $responce="error";
+                endif;
         endforeach;
-        CTaskComments::Add($parentId,  1, $DescriptionText);
-        echo $responce;
+//        CTaskComments::Add($parentId,  1, $DescriptionText);
+        echo  $responce;
          elseif ($_REQUEST['type']=="changeUserSetting"):
              $responce="error";
              $user = new CUser;
